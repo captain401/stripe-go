@@ -10,8 +10,9 @@ import (
 // SourceParams is a union struct used to describe an
 // arbitrary payment source.
 type SourceParams struct {
-	Token string
-	Card  *CardParams
+	Token       string
+	Card        *CardParams
+	BankAccount *BankAccountParams
 }
 
 // AppendDetails adds the source's details to the query string values.
@@ -22,6 +23,8 @@ func (sp *SourceParams) AppendDetails(values *url.Values, creating bool) {
 		values.Add("source", sp.Token)
 	} else if sp.Card != nil {
 		sp.Card.AppendDetails(values, creating)
+	} else if sp.BankAccount != nil {
+		sp.BankAccount.AppendDetails(values)
 	}
 }
 
@@ -63,6 +66,10 @@ func SourceParamsFor(obj interface{}) (*SourceParams, error) {
 	case *CardParams:
 		sp = &SourceParams{
 			Card: p,
+		}
+	case *BankAccountParams:
+		sp = &SourceParams{
+			BankAccount: p,
 		}
 	case string:
 		sp = &SourceParams{
