@@ -1,3 +1,53 @@
+13.1.0 2016-03-15
+	Add `Reject` on `Account` to support the new API feature
+
+13.0.0 2016-03-15
+	Upgrade API version to 2016-03-07
+	Remove `Account.BankAccounts` in favor of `ExternalAccounts`	
+	Remove `Account.Currencies` in favor of `CountrySpec`
+
+12.1.0 2016-02-04
+	Add `ListParams.StripeAccount` for making list calls on behalf of connected accounts
+	Add `Params.StripeAccount` for symmetry with `ListParams.StripeAccount`
+	Deprecate `Params.Account` in favor of `Params.StripeAccount`
+
+12.0.0 2016-02-02
+	Add support for fetching events for managed accounts (`event.Get` now takes `Params`)
+
+11.5.0 2016-02-26
+	Allow a `PII.PersonalIDNumber` number to be used to create a token
+
+11.4.0 2016-02-24
+	Add missing subscription fields to `InvoiceParams` for use with `invoice.GetNext`
+
+11.3.0 2016-02-19
+	Add `AccountHolderName` and `AccountHolderType` to bank accounts
+
+11.2.0 2016-02-11
+	Add support for `CountrySpec`
+	Add `SSNProvided`, `PersonalIDProvided` and `BusinessTaxIDProvided` to `LegalEntity`
+
+11.1.2 2016-02-02
+	Fix card update method to correctly take expiration date
+
+11.1.1 2016-02-01
+	Fix recipient update so that it can take a bank token (like create)
+
+11.0.1 2016-01-11
+	Add missing field `country` to shipping details of `Charge` and `Customer`
+
+11.0.0 2016-01-07
+	Add missing field `Default` to `BankAccount`
+	Add `OrderParams` parameter to `Order` retrieval
+	Fix parameter bug when creating a new `Order`
+	Support special value of 'now' for trial end when updating subscriptions
+
+10.3.0 2015-12-10
+	Allow an account to be referenced when creating a card
+
+10.2.0 2015-12-04
+	Add `Update` function on `Coupon` client so that metadata can be set
+
 10.1.0 2015-12-01
 	Add a verification routine for external accounts
 

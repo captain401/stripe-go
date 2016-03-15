@@ -1,17 +1,16 @@
-Go Stripe [![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/stripe/stripe-go) [![Build Status](https://travis-ci.org/stripe/stripe-go.svg?branch=master)](https://travis-ci.org/stripe/stripe-go)
-========
+# Go Stripe [![GoDoc](http://img.shields.io/badge/godoc-reference-blue.svg)](http://godoc.org/github.com/stripe/stripe-go) [![Build Status](https://travis-ci.org/stripe/stripe-go.svg?branch=master)](https://travis-ci.org/stripe/stripe-go)
 
 ## Summary
 
-The official [Stripe](https://stripe.com) Go client library.
+The official [Stripe][stripe] Go client library.
 
 ## Versioning
 
 Each revision of the binding is tagged and the version is updated accordingly.
 
 Given Go's lack of built-in versioning, it is highly recommended you use a
-[package management tool](https://code.google.com/p/go-wiki/wiki/PackageManagementTools) in order
-to ensure a newer version of the binding does not affect backwards compatibility.
+[package management tool][package-management] in order to ensure a newer
+version of the binding does not affect backwards compatibility.
 
 To see the list of past versions, run `git tag`. To manually get an older
 version of the client, clone this repo, checkout the specific tag and build the
@@ -19,13 +18,13 @@ library:
 
 ```sh
 git clone https://github.com/stripe/stripe-go.git
-cd stripe
+cd stripe-go
 git checkout api_version_tag
 make build
 ```
 
-For more details on changes between versions, see the [binding changelog](CHANGELOG)
-and [API changelog](https://stripe.com/docs/upgrades).
+For more details on changes between versions, see the [binding
+changelog](CHANGELOG) and [API changelog][api-changelog].
 
 ## Installation
 
@@ -35,9 +34,11 @@ go get github.com/stripe/stripe-go
 
 ## Documentation
 
-For a comprehensive list of examples, check out the [API documentation](https://stripe.com/docs/api/go).
+For a comprehensive list of examples, check out the [API
+documentation][api-docs].
 
-For details on all the functionality in this library, see the [GoDoc](http://godoc.org/github.com/stripe/stripe-go) documentation.
+For details on all the functionality in this library, see the [GoDoc][godoc]
+documentation.
 
 Below are a few simple examples:
 
@@ -93,12 +94,30 @@ for i.Next() {
 }
 ```
 
-Alternatively, you can use the `even.Data.Raw` property to unmarshal to the appropriate struct.
+Alternatively, you can use the `even.Data.Raw` property to unmarshal to the
+appropriate struct.
 
-### Connect Flows
+### Authentication with Connect
 
-If you're using an `access token` you will need to use a client. Simply pass
-the `access token` value as the `tok` when initializing the client.
+There are two ways of authenticating requests when performing actions on behalf
+of a connected account, one that uses the `Stripe-Account` header containing an
+account's ID, and one that uses the account's keys. Usually the former is the
+recommended approach. [See the documentation for more information][connect].
+
+To use the `Stripe-Account` approach, pass the `StripeAccount` field to a
+`ListParams` or `Params` class. For example:
+
+```go
+// For a list request
+listParams := &stripe.ChargeListParams{StripeAccount: merchantID}
+```
+
+```go
+// For any other kind of request
+params := &stripe.CustomerParams{StripeAccount: merchantID}
+```
+
+To use a key, pass it to `API`'s `Init` function:
 
 ```go
 
@@ -113,9 +132,9 @@ stripe.Init("access_token", nil)
 
 ### Google AppEngine
 
-If you're running the client in a Google AppEngine environment, you'll
-need to create a per-request Stripe client since the
-`http.DefaultClient` is not available. Here's a sample handler:
+If you're running the client in a Google AppEngine environment, you'll need to
+create a per-request Stripe client since the `http.DefaultClient` is not
+available. Here's a sample handler:
 
 ```go
 import (
@@ -182,15 +201,13 @@ for i.Next() {
 if err := i.Err(); err != nil {
   // handle
 }
-
-
 ```
 
 ### With a Client
 
-If you're dealing with multiple keys, it is recommended you use the
-`client.API`.  This allows you to create as many clients as needed, each with
-their own individual key.
+If you're dealing with multiple keys, it is recommended you use `client.API`.
+This allows you to create as many clients as needed, each with their own
+individual key.
 
 ```go
 import (
@@ -238,10 +255,34 @@ the following guidelines in mind:
 
 For running additional tests, follow the steps below:
 
-Set the STRIPE_KEY environment variable to match your test private key, then run `make test`:
+Set the `STRIPE_KEY` environment variable to match your test private key, then
+run `make test`:
+
 ```sh
 STRIPE_KEY=YOUR_API_KEY make test
 ```
 
-For any requests, bug or comments, please [open an issue](https://github.com/stripe/stripe-go/issues/new)
-or [submit a pull request](https://github.com/stripe/stripe-go/pulls).
+Or to run tests for a particular subpackage:
+
+```sh
+STRIPE_KEY=YOUR_API_KEY go test ./invoice
+```
+
+Or to run a particular test (it's worth noting however that Go will report a
+success even if the referenced test doesn't exist):
+
+```sh
+STRIPE_KEY=YOUR_API_KEY go test -run "TestAllInvoicesScenarios" ./invoice
+```
+
+For any requests, bug or comments, please [open an issue][issues] or [submit a
+pull request][pulls].
+
+[api-docs]: https://stripe.com/docs/api/go
+[api-changelog]: https://stripe.com/docs/upgrades
+[connect]: https://stripe.com/docs/connect/authentication
+[godoc]: http://godoc.org/github.com/stripe/stripe-go
+[issues]: https://github.com/stripe/stripe-go/issues/new
+[package-management]: https://code.google.com/p/go-wiki/wiki/PackageManagementTools
+[pulls]: https://github.com/stripe/stripe-go/pulls
+[stripe]: https://stripe.com

@@ -162,6 +162,7 @@ func (c Client) List(params *stripe.ProductListParams) *Iter {
 
 	var body *url.Values
 	var lp *stripe.ListParams
+	var p *stripe.Params
 
 	if params != nil {
 		body = &url.Values{}
@@ -186,11 +187,12 @@ func (c Client) List(params *stripe.ProductListParams) *Iter {
 
 		params.AppendTo(body)
 		lp = &params.ListParams
+		p = params.ToParams()
 	}
 
 	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
 		list := &productList{}
-		err := c.B.Call("GET", "/products", c.Key, &b, nil, list)
+		err := c.B.Call("GET", "/products", c.Key, &b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {
@@ -212,6 +214,18 @@ type Iter struct {
 // visited by a call to Next.
 func (i *Iter) Product() *stripe.Product {
 	return i.Current().(*stripe.Product)
+}
+
+// Delete deletes a product
+// For more details see https://stripe.com/docs/api#delete_product.
+func Delete(id string) error {
+	return getC().Delete(id)
+}
+
+// Delete deletes a product.
+// For more details see https://stripe.com/docs/api#delete_product.
+func (c Client) Delete(id string) error {
+	return c.B.Call("DELETE", "/products/"+id, c.Key, nil, nil, nil)
 }
 
 func getC() Client {

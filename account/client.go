@@ -188,6 +188,22 @@ func (c Client) Del(id string) (*stripe.Account, error) {
 	return acct, err
 }
 
+// Reject rejects an account
+func Reject(id string, params *stripe.AccountRejectParams) (*stripe.Account, error) {
+	return getC().Reject(id, params)
+}
+
+func (c Client) Reject(id string, params *stripe.AccountRejectParams) (*stripe.Account, error) {
+	body := &url.Values{}
+	if len(params.Reason) > 0 {
+		body.Add("reason", params.Reason)
+	}
+	acct := &stripe.Account{}
+	err := c.B.Call("POST", "/accounts/"+id+"/reject", c.Key, body, nil, acct)
+
+	return acct, err
+}
+
 // List lists your accounts.
 func List(params *stripe.AccountListParams) *Iter {
 	return getC().List(params)
@@ -201,17 +217,19 @@ func (c Client) List(params *stripe.AccountListParams) *Iter {
 
 	var body *url.Values
 	var lp *stripe.ListParams
+	var p *stripe.Params
 
 	if params != nil {
 		body = &url.Values{}
 
 		params.AppendTo(body)
 		lp = &params.ListParams
+		p = params.ToParams()
 	}
 
 	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
 		list := &accountList{}
-		err := c.B.Call("GET", "/accounts", c.Key, &b, nil, list)
+		err := c.B.Call("GET", "/accounts", c.Key, &b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {

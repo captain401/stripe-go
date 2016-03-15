@@ -25,7 +25,8 @@ type CardFunding string
 type CardParams struct {
 	Params
 	Token                                         string
-	Customer, Recipient                           string
+	Default                                       bool
+	Account, Customer, Recipient                  string
 	Name, Number, Month, Year, CVC                string
 	Address1, Address2, City, State, Zip, Country string
 }
@@ -34,7 +35,7 @@ type CardParams struct {
 // For more details see https://stripe.com/docs/api#list_cards.
 type CardListParams struct {
 	ListParams
-	Customer, Recipient string
+	Account, Customer, Recipient string
 }
 
 // Card is the resource representing a Stripe credit/debit card.
@@ -47,6 +48,7 @@ type Card struct {
 	Funding       CardFunding  `json:"funding"`
 	LastFour      string       `json:"last4"`
 	Brand         CardBrand    `json:"brand"`
+	Default       bool         `json:"default_for_currency"`
 	City          string       `json:"address_city"`
 	Country       string       `json:"address_country"`
 	Address1      string       `json:"address_line1"`
@@ -75,17 +77,33 @@ type CardList struct {
 // on updates they are simply the parameter name.
 func (c *CardParams) AppendDetails(values *url.Values, creating bool) {
 	if creating {
-		if len(c.Token) > 0 {
+		if len(c.Token) > 0 && len(c.Account) > 0 {
+			values.Add("external_account", c.Token)
+		} else if len(c.Token) > 0 {
 			values.Add("card", c.Token)
 		} else {
 			values.Add("card[object]", "card")
 			values.Add("card[number]", c.Number)
-			values.Add("card[exp_month]", c.Month)
-			values.Add("card[exp_year]", c.Year)
 
 			if len(c.CVC) > 0 {
 				values.Add("card[cvc]", c.CVC)
 			}
+		}
+	}
+
+	if len(c.Month) > 0 {
+		if creating {
+			values.Add("card[exp_month]", c.Month)
+		} else {
+			values.Add("exp_month", c.Month)
+		}
+	}
+
+	if len(c.Year) > 0 {
+		if creating {
+			values.Add("card[exp_year]", c.Year)
+		} else {
+			values.Add("exp_year", c.Year)
 		}
 	}
 

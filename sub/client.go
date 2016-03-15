@@ -130,7 +130,9 @@ func (c Client) Update(id string, params *stripe.SubParams) (*stripe.Sub, error)
 		body.Add("coupon", params.Coupon)
 	}
 
-	if params.TrialEnd > 0 {
+	if params.TrialEndNow {
+		body.Add("trial_end", "now")
+	} else if params.TrialEnd > 0 {
 		body.Add("trial_end", strconv.FormatInt(params.TrialEnd, 10))
 	}
 
@@ -189,13 +191,15 @@ func List(params *stripe.SubListParams) *Iter {
 func (c Client) List(params *stripe.SubListParams) *Iter {
 	body := &url.Values{}
 	var lp *stripe.ListParams
+	var p *stripe.Params
 
 	params.AppendTo(body)
 	lp = &params.ListParams
+	p = params.ToParams()
 
 	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
 		list := &stripe.SubList{}
-		err := c.B.Call("GET", fmt.Sprintf("/customers/%v/subscriptions", params.Customer), c.Key, &b, nil, list)
+		err := c.B.Call("GET", fmt.Sprintf("/customers/%v/subscriptions", params.Customer), c.Key, &b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {

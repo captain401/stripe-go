@@ -44,6 +44,41 @@ func TestAccountNew(t *testing.T) {
 	}
 }
 
+func TestAccountLegalEntity(t *testing.T) {
+	params := &stripe.AccountParams{
+		Managed: true,
+		Country: "US",
+		LegalEntity: &stripe.LegalEntity{
+			Type:          stripe.Company,
+			BusinessTaxID: "111111",
+			SSN:           "1111",
+			PersonalID:    "111111111",
+			DOB: stripe.DOB{
+				Day:   1,
+				Month: 2,
+				Year:  1990,
+			},
+		},
+	}
+
+	target, err := New(params)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if !target.LegalEntity.BusinessTaxIDProvided {
+		t.Errorf("Account is missing BusinessTaxIDProvided even though we submitted the value.\n")
+	}
+
+	if !target.LegalEntity.SSNProvided {
+		t.Errorf("Account is missing SSNProvided even though we submitted the value.\n")
+	}
+
+	if !target.LegalEntity.PersonalIDProvided {
+		t.Errorf("Account is missing PersonalIDProvided even though we submitted the value.\n")
+	}
+}
+
 func TestAccountDelete(t *testing.T) {
 	params := &stripe.AccountParams{
 		Managed:              true,
@@ -77,6 +112,42 @@ func TestAccountDelete(t *testing.T) {
 
 	if !acctDel.Deleted {
 		t.Errorf("Account id %q expected to be marked as deleted on the returned resource\n", acctDel.ID)
+	}
+}
+
+func TestAccountReject(t *testing.T) {
+	params := &stripe.AccountParams{
+		Managed:              true,
+		Country:              "CA",
+		BusinessUrl:          "www.stripe.com",
+		BusinessName:         "Stripe",
+		BusinessPrimaryColor: "#ffffff",
+		SupportEmail:         "foo@bar.com",
+		SupportUrl:           "www.stripe.com",
+		SupportPhone:         "4151234567",
+		LegalEntity: &stripe.LegalEntity{
+			Type:         stripe.Individual,
+			BusinessName: "Stripe Go",
+			DOB: stripe.DOB{
+				Day:   1,
+				Month: 2,
+				Year:  1990,
+			},
+		},
+	}
+
+	acct, err := New(params)
+	if err != nil {
+		t.Error(err)
+	}
+
+	rejectedAcct, err := Reject(acct.ID, &stripe.AccountRejectParams{Reason: "fraud"})
+	if err != nil {
+		t.Error(err)
+	}
+
+	if rejectedAcct.Verification.DisabledReason != "rejected.fraud" {
+		t.Error("Account DisabledReason did not change to rejected.fraud.")
 	}
 }
 
@@ -178,10 +249,6 @@ func TestAccountGet(t *testing.T) {
 
 	if len(target.Country) == 0 {
 		t.Errorf("Account is missing country\n")
-	}
-
-	if len(target.Currencies) == 0 {
-		t.Errorf("Account is missing currencies\n")
 	}
 
 	if len(target.DefaultCurrency) == 0 {

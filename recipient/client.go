@@ -105,7 +105,11 @@ func (c Client) Update(id string, params *stripe.RecipientParams) (*stripe.Recip
 		}
 
 		if params.Bank != nil {
-			params.Bank.AppendDetails(body)
+			if len(params.Bank.Token) > 0 {
+				body.Add("bank_account", params.Bank.Token)
+			} else {
+				params.Bank.AppendDetails(body)
+			}
 		}
 
 		if len(params.Token) > 0 {
@@ -166,6 +170,7 @@ func (c Client) List(params *stripe.RecipientListParams) *Iter {
 
 	var body *url.Values
 	var lp *stripe.ListParams
+	var p *stripe.Params
 
 	if params != nil {
 		body = &url.Values{}
@@ -176,11 +181,12 @@ func (c Client) List(params *stripe.RecipientListParams) *Iter {
 
 		params.AppendTo(body)
 		lp = &params.ListParams
+		p = params.ToParams()
 	}
 
 	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
 		list := &recipientList{}
-		err := c.B.Call("GET", "/recipients", c.Key, &b, nil, list)
+		err := c.B.Call("GET", "/recipients", c.Key, &b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {

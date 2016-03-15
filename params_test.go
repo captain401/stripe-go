@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	stripe "github.com/stripe/stripe-go"
+	. "github.com/stripe/stripe-go/testing"
 )
 
 func TestParamsWithExtras(t *testing.T) {
@@ -42,7 +43,7 @@ func TestParamsWithExtras(t *testing.T) {
 	}
 }
 
-func TestListParamsExpansion(t *testing.T) {
+func TestCheckinListParamsExpansion(t *testing.T) {
 	testCases := []struct {
 		InitialBody  url.Values
 		Expand       []string
@@ -54,7 +55,7 @@ func TestListParamsExpansion(t *testing.T) {
 			ExpectedBody: url.Values{"foo": {"bar"}},
 		},
 		{
-			InitialBody:  url.Values{"foo": {"bar"}},
+			InitialBody:  url.Values{"foo": {"bar", "baz"}},
 			Expand:       []string{"data", "data.foo"},
 			ExpectedBody: url.Values{"foo": {"bar", "baz"}, "expand[]": {"data", "data.foo"}},
 		},
@@ -73,5 +74,42 @@ func TestListParamsExpansion(t *testing.T) {
 		if !reflect.DeepEqual(body, testCase.ExpectedBody) {
 			t.Fatalf("Expected body of %v but got %v.", testCase.ExpectedBody, body)
 		}
+	}
+}
+
+func TestCheckinListParamsToParams(t *testing.T) {
+	listParams := &stripe.ListParams{StripeAccount: TestMerchantID}
+	params := listParams.ToParams()
+
+	if params.StripeAccount != TestMerchantID {
+		t.Fatalf("Expected StripeAccount of %v but got %v.",
+			TestMerchantID, params.StripeAccount)
+	}
+}
+
+func TestCheckinParamsSetAccount(t *testing.T) {
+	p := &stripe.Params{}
+	p.SetAccount(TestMerchantID)
+
+	if p.Account != TestMerchantID {
+		t.Fatalf("Expected Account of %v but got %v.", TestMerchantID, p.Account)
+	}
+
+	if p.StripeAccount != TestMerchantID {
+		t.Fatalf("Expected StripeAccount of %v but got %v.", TestMerchantID, p.StripeAccount)
+	}
+}
+
+func TestCheckinParamsSetStripeAccount(t *testing.T) {
+	p := &stripe.Params{}
+	p.SetStripeAccount(TestMerchantID)
+
+	if p.StripeAccount != TestMerchantID {
+		t.Fatalf("Expected Account of %v but got %v.", TestMerchantID, p.StripeAccount)
+	}
+
+	// Check that we don't set the deprecated parameter.
+	if p.Account != "" {
+		t.Fatalf("Expected empty Account but got %v.", TestMerchantID)
 	}
 }

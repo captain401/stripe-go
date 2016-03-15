@@ -171,6 +171,26 @@ func (c Client) GetNext(params *stripe.InvoiceParams) (*stripe.Invoice, error) {
 		body.Add("subscription", params.Sub)
 	}
 
+	if len(params.SubPlan) > 0 {
+		body.Add("subscription_plan", params.SubPlan)
+	}
+
+	if params.SubNoProrate {
+		body.Add("subscription_prorate", strconv.FormatBool(false))
+	}
+
+	if params.SubProrationDate > 0 {
+		body.Add("subscription_proration_date", strconv.FormatInt(params.SubProrationDate, 10))
+	}
+
+	if params.SubQuantity > 0 {
+		body.Add("subscription_quantity", strconv.FormatUint(params.SubQuantity, 10))
+	}
+
+	if params.SubTrialEnd > 0 {
+		body.Add("subscription_trial_end", strconv.FormatInt(params.SubTrialEnd, 10))
+	}
+
 	params.AppendTo(body)
 
 	invoice := &stripe.Invoice{}
@@ -193,6 +213,7 @@ func (c Client) List(params *stripe.InvoiceListParams) *Iter {
 
 	var body *url.Values
 	var lp *stripe.ListParams
+	var p *stripe.Params
 
 	if params != nil {
 		body = &url.Values{}
@@ -207,11 +228,12 @@ func (c Client) List(params *stripe.InvoiceListParams) *Iter {
 
 		params.AppendTo(body)
 		lp = &params.ListParams
+		p = params.ToParams()
 	}
 
 	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
 		list := &invoiceList{}
-		err := c.B.Call("GET", "/invoices", c.Key, &b, nil, list)
+		err := c.B.Call("GET", "/invoices", c.Key, &b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {
@@ -231,6 +253,7 @@ func ListLines(params *stripe.InvoiceLineListParams) *LineIter {
 func (c Client) ListLines(params *stripe.InvoiceLineListParams) *LineIter {
 	body := &url.Values{}
 	var lp *stripe.ListParams
+	var p *stripe.Params
 
 	if len(params.Customer) > 0 {
 		body.Add("customer", params.Customer)
@@ -242,10 +265,11 @@ func (c Client) ListLines(params *stripe.InvoiceLineListParams) *LineIter {
 
 	params.AppendTo(body)
 	lp = &params.ListParams
+	p = params.ToParams()
 
 	return &LineIter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
 		list := &stripe.InvoiceLineList{}
-		err := c.B.Call("GET", fmt.Sprintf("/invoices/%v/lines", params.ID), c.Key, &b, nil, list)
+		err := c.B.Call("GET", fmt.Sprintf("/invoices/%v/lines", params.ID), c.Key, &b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {
