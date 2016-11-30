@@ -4,7 +4,6 @@ package card
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"strconv"
 
 	stripe "github.com/stripe/stripe-go"
@@ -42,7 +41,7 @@ func New(params *stripe.CardParams) (*stripe.Card, error) {
 }
 
 func (c Client) New(params *stripe.CardParams) (*stripe.Card, error) {
-	body := &url.Values{}
+	body := &stripe.RequestValues{}
 	params.AppendDetails(body, true)
 	params.AppendTo(body)
 
@@ -72,12 +71,12 @@ func Get(id string, params *stripe.CardParams) (*stripe.Card, error) {
 }
 
 func (c Client) Get(id string, params *stripe.CardParams) (*stripe.Card, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
 		commonParams = &params.Params
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 		params.AppendTo(body)
 	}
 
@@ -104,7 +103,7 @@ func Update(id string, params *stripe.CardParams) (*stripe.Card, error) {
 }
 
 func (c Client) Update(id string, params *stripe.CardParams) (*stripe.Card, error) {
-	body := &url.Values{}
+	body := &stripe.RequestValues{}
 	params.AppendDetails(body, false)
 	params.AppendTo(body)
 
@@ -112,6 +111,9 @@ func (c Client) Update(id string, params *stripe.CardParams) (*stripe.Card, erro
 	var err error
 
 	if len(params.Account) > 0 {
+		if params.Default {
+			body.Add("default_for_currency", strconv.FormatBool(params.Default))
+		}
 		err = c.B.Call("POST", fmt.Sprintf("/accounts/%v/external_accounts/%v", params.Account, id), c.Key, body, &params.Params, card)
 	} else if len(params.Customer) > 0 {
 		err = c.B.Call("POST", fmt.Sprintf("/customers/%v/cards/%v", params.Customer, id), c.Key, body, &params.Params, card)
@@ -154,7 +156,7 @@ func List(params *stripe.CardListParams) *Iter {
 }
 
 func (c Client) List(params *stripe.CardListParams) *Iter {
-	body := &url.Values{}
+	body := &stripe.RequestValues{}
 	var lp *stripe.ListParams
 	var p *stripe.Params
 
@@ -162,16 +164,16 @@ func (c Client) List(params *stripe.CardListParams) *Iter {
 	lp = &params.ListParams
 	p = params.ToParams()
 
-	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
+	return &Iter{stripe.GetIter(lp, body, func(b *stripe.RequestValues) ([]interface{}, stripe.ListMeta, error) {
 		list := &stripe.CardList{}
 		var err error
 
 		if len(params.Account) > 0 {
-			err = c.B.Call("GET", fmt.Sprintf("/accounts/%v/external_accounts", params.Account), c.Key, &b, p, list)
+			err = c.B.Call("GET", fmt.Sprintf("/accounts/%v/external_accounts", params.Account), c.Key, b, p, list)
 		} else if len(params.Customer) > 0 {
-			err = c.B.Call("GET", fmt.Sprintf("/customers/%v/cards", params.Customer), c.Key, &b, p, list)
+			err = c.B.Call("GET", fmt.Sprintf("/customers/%v/cards", params.Customer), c.Key, b, p, list)
 		} else if len(params.Recipient) > 0 {
-			err = c.B.Call("GET", fmt.Sprintf("/recipients/%v/cards", params.Recipient), c.Key, &b, p, list)
+			err = c.B.Call("GET", fmt.Sprintf("/recipients/%v/cards", params.Recipient), c.Key, b, p, list)
 		} else {
 			err = errors.New("Invalid card params: either account, customer or recipient need to be set")
 		}

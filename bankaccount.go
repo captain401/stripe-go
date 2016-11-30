@@ -3,7 +3,6 @@ package stripe
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
 )
 
 // BankAccountStatus is the list of allowed values for the bank account's status.
@@ -33,7 +32,14 @@ type BankAccountParams struct {
 // BankAccountListParams is the set of parameters that can be used when listing bank accounts.
 type BankAccountListParams struct {
 	ListParams
+
+	// The identifier of the parent account under which the bank accounts are
+	// nested. Either AccountID or Customer should be populated.
 	AccountID string
+
+	// The identifier of the parent customer under which the bank accounts are
+	// nested. Either AccountID or Customer should be populated.
+	Customer string
 }
 
 // BankAccount represents a Stripe bank account.
@@ -51,6 +57,7 @@ type BankAccount struct {
 	Routing           string            `json:"routing_number"`
 	Deleted           bool              `json:"deleted"`
 	Customer          *Customer         `json:"customer"`
+	Meta              map[string]string `json:"metadata"`
 }
 
 // BankAccountList is a list object for bank accounts.
@@ -59,14 +66,17 @@ type BankAccountList struct {
 	Values []*BankAccount `json:"data"`
 }
 
-func (ba *BankAccount) Display() string {
-	return fmt.Sprintf("Bank account ending in %s", ba.LastFour)
+// Display implements Displayer.Display.
+func (b *BankAccount) Display() string {
+	return fmt.Sprintf("Bank account ending in %s", b.LastFour)
 }
 
 // AppendDetails adds the bank account's details to the query string values.
-func (b *BankAccountParams) AppendDetails(values *url.Values) {
+func (b *BankAccountParams) AppendDetails(values *RequestValues) {
 	values.Add("bank_account[country]", b.Country)
-	values.Add("bank_account[routing_number]", b.Routing)
+	if len(b.Routing) > 0 {
+		values.Add("bank_account[routing_number]", b.Routing)
+	}
 	values.Add("bank_account[account_number]", b.Account)
 	if b.AccountHolderName != "" {
 		values.Add("bank_account[account_holder_name]", b.AccountHolderName)

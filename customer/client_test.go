@@ -5,7 +5,9 @@ import (
 
 	stripe "github.com/stripe/stripe-go"
 	"github.com/stripe/stripe-go/coupon"
+	"github.com/stripe/stripe-go/currency"
 	"github.com/stripe/stripe-go/discount"
+	"github.com/stripe/stripe-go/plan"
 	. "github.com/stripe/stripe-go/utils"
 )
 
@@ -15,9 +17,10 @@ func init() {
 
 func TestCustomerNew(t *testing.T) {
 	customerParams := &stripe.CustomerParams{
-		Balance: -123,
-		Desc:    "Test Customer",
-		Email:   "a@b.com",
+		Balance:       -123,
+		Desc:          "Test Customer",
+		Email:         "a@b.com",
+		BusinessVatID: "123456789",
 	}
 	customerParams.SetSource(&stripe.CardParams{
 		Name:   "Test Card",
@@ -45,6 +48,10 @@ func TestCustomerNew(t *testing.T) {
 		t.Errorf("Email %q does not match expected email %q\n", target.Email, customerParams.Email)
 	}
 
+	if target.BusinessVatID != customerParams.BusinessVatID {
+		t.Errorf("Business Vat Id %q does not match expected description %q\n", target.BusinessVatID, customerParams.BusinessVatID)
+	}
+
 	if target.Meta["id"] != customerParams.Meta["id"] {
 		t.Errorf("Meta %v does not match expected Meta %v\n", target.Meta, customerParams.Meta)
 	}
@@ -62,6 +69,48 @@ func TestCustomerNew(t *testing.T) {
 	}
 
 	Del(target.ID)
+}
+
+func TestCustomerNewWithPlan(t *testing.T) {
+	planParams := &stripe.PlanParams{
+		ID:       "test",
+		Name:     "Test Plan",
+		Amount:   99,
+		Currency: currency.USD,
+		Interval: plan.Month,
+	}
+
+	_, err := plan.New(planParams)
+	if err != nil {
+		t.Error(err)
+	}
+
+	customerParams := &stripe.CustomerParams{
+		Plan:       planParams.ID,
+		TaxPercent: 10.0,
+	}
+	customerParams.SetSource(&stripe.CardParams{
+		Name:   "Test Card",
+		Number: "378282246310005",
+		Month:  "06",
+		Year:   "20",
+	})
+
+	target, err := New(customerParams)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = Del(target.ID)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = plan.Del(planParams.ID)
+	if err != nil {
+		t.Error(err)
+	}
 }
 
 func TestCustomerNewWithShipping(t *testing.T) {
@@ -181,9 +230,10 @@ func TestCustomerDel(t *testing.T) {
 
 func TestCustomerUpdate(t *testing.T) {
 	customerParams := &stripe.CustomerParams{
-		Balance: 7,
-		Desc:    "Original Desc",
-		Email:   "first@b.com",
+		Balance:       7,
+		Desc:          "Original Desc",
+		Email:         "first@b.com",
+		BusinessVatID: "123456789",
 	}
 	customerParams.SetSource(&stripe.CardParams{
 		Number: "378282246310005",
@@ -194,9 +244,10 @@ func TestCustomerUpdate(t *testing.T) {
 	original, _ := New(customerParams)
 
 	updated := &stripe.CustomerParams{
-		Balance: -10,
-		Desc:    "Updated Desc",
-		Email:   "desc@b.com",
+		Balance:       -10,
+		Desc:          "Updated Desc",
+		Email:         "desc@b.com",
+		BusinessVatID: "5555555",
 	}
 	updated.SetSource(&stripe.CardParams{
 		Number: "4242424242424242",
@@ -206,6 +257,12 @@ func TestCustomerUpdate(t *testing.T) {
 	})
 
 	target, err := Update(original.ID, updated)
+
+	updated2 := &stripe.CustomerParams{
+		BalanceZero: true,
+	}
+
+	target2, err := Update(original.ID, updated2)
 
 	if err != nil {
 		t.Error(err)
@@ -223,8 +280,16 @@ func TestCustomerUpdate(t *testing.T) {
 		t.Errorf("Email %q does not match expected email %q\n", target.Email, updated.Email)
 	}
 
+	if target.BusinessVatID != updated.BusinessVatID {
+		t.Errorf("Business Vat Id %q does not match expected description %q\n", target.BusinessVatID, updated.BusinessVatID)
+	}
+
 	if target.Sources == nil {
 		t.Errorf("No sources recorded\n")
+	}
+
+	if target2.Balance != 0 {
+		t.Errorf("BalanceZero did not reset the balance to 0: %v\n", target2.Balance)
 	}
 
 	Del(target.ID)

@@ -2,7 +2,6 @@
 package event
 
 import (
-	"net/url"
 	"strconv"
 
 	stripe "github.com/stripe/stripe-go"
@@ -34,17 +33,12 @@ func List(params *stripe.EventListParams) *Iter {
 }
 
 func (c Client) List(params *stripe.EventListParams) *Iter {
-	type eventList struct {
-		stripe.ListMeta
-		Values []*stripe.Event `json:"data"`
-	}
-
-	var body *url.Values
+	var body *stripe.RequestValues
 	var lp *stripe.ListParams
 	var p *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		if params.Created > 0 {
 			body.Add("created", strconv.FormatInt(params.Created, 10))
@@ -59,9 +53,9 @@ func (c Client) List(params *stripe.EventListParams) *Iter {
 		p = params.ToParams()
 	}
 
-	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
-		list := &eventList{}
-		err := c.B.Call("GET", "/events", c.Key, &b, p, list)
+	return &Iter{stripe.GetIter(lp, body, func(b *stripe.RequestValues) ([]interface{}, stripe.ListMeta, error) {
+		list := &stripe.EventList{}
+		err := c.B.Call("GET", "/events", c.Key, b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {

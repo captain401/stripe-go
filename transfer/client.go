@@ -3,7 +3,6 @@ package transfer
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 
 	stripe "github.com/stripe/stripe-go"
@@ -16,8 +15,14 @@ const (
 	Failed   stripe.TransferStatus = "failed"
 	Canceled stripe.TransferStatus = "canceled"
 
-	Card stripe.TransferType = "card"
-	Bank stripe.TransferType = "bank_account"
+	Card          stripe.TransferType = "card"
+	Bank          stripe.TransferType = "bank_account"
+	StripeAccount stripe.TransferType = "stripe_account"
+
+	SourceAlipay  stripe.TransferSourceType = "alipay_account"
+	SourceBank    stripe.TransferSourceType = "bank_account"
+	SourceBitcoin stripe.TransferSourceType = "bitcoin_receiver"
+	SourceCard    stripe.TransferSourceType = "card"
 
 	InsufficientFunds    stripe.TransferFailCode = "insufficient_funds"
 	AccountClosed        stripe.TransferFailCode = "account_closed"
@@ -44,10 +49,9 @@ func New(params *stripe.TransferParams) (*stripe.Transfer, error) {
 }
 
 func (c Client) New(params *stripe.TransferParams) (*stripe.Transfer, error) {
-	body := &url.Values{
-		"amount":   {strconv.FormatInt(params.Amount, 10)},
-		"currency": {string(params.Currency)},
-	}
+	body := &stripe.RequestValues{}
+	body.Add("amount", strconv.FormatInt(params.Amount, 10))
+	body.Add("currency", string(params.Currency))
 
 	if len(params.Recipient) > 0 {
 		body.Add("recipient", params.Recipient)
@@ -78,6 +82,10 @@ func (c Client) New(params *stripe.TransferParams) (*stripe.Transfer, error) {
 	if params.Fee > 0 {
 		body.Add("application_fee", strconv.FormatUint(params.Fee, 10))
 	}
+
+	if len(params.SourceType) > 0 {
+		body.Add("source_type", string(params.SourceType))
+	}
 	params.AppendTo(body)
 
 	transfer := &stripe.Transfer{}
@@ -93,12 +101,12 @@ func Get(id string, params *stripe.TransferParams) (*stripe.Transfer, error) {
 }
 
 func (c Client) Get(id string, params *stripe.TransferParams) (*stripe.Transfer, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
 		commonParams = &params.Params
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 		params.AppendTo(body)
 	}
 
@@ -115,13 +123,13 @@ func Update(id string, params *stripe.TransferParams) (*stripe.Transfer, error) 
 }
 
 func (c Client) Update(id string, params *stripe.TransferParams) (*stripe.Transfer, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
 		commonParams = &params.Params
 
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		if len(params.Desc) > 0 {
 			body.Add("description", params.Desc)
@@ -143,13 +151,13 @@ func Cancel(id string, params *stripe.TransferParams) (*stripe.Transfer, error) 
 }
 
 func (c Client) Cancel(id string, params *stripe.TransferParams) (*stripe.Transfer, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
 		commonParams = &params.Params
 
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 		params.AppendTo(body)
 	}
 
@@ -166,17 +174,12 @@ func List(params *stripe.TransferListParams) *Iter {
 }
 
 func (c Client) List(params *stripe.TransferListParams) *Iter {
-	type transferList struct {
-		stripe.ListMeta
-		Values []*stripe.Transfer `json:"data"`
-	}
-
-	var body *url.Values
+	var body *stripe.RequestValues
 	var lp *stripe.ListParams
 	var p *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		if params.Created > 0 {
 			body.Add("created", strconv.FormatInt(params.Created, 10))
@@ -199,9 +202,9 @@ func (c Client) List(params *stripe.TransferListParams) *Iter {
 		p = params.ToParams()
 	}
 
-	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
-		list := &transferList{}
-		err := c.B.Call("GET", "/transfers", c.Key, &b, p, list)
+	return &Iter{stripe.GetIter(lp, body, func(b *stripe.RequestValues) ([]interface{}, stripe.ListMeta, error) {
+		list := &stripe.TransferList{}
+		err := c.B.Call("GET", "/transfers", c.Key, b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {

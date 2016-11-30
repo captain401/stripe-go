@@ -2,7 +2,6 @@
 package customer
 
 import (
-	"net/url"
 	"strconv"
 
 	stripe "github.com/stripe/stripe-go"
@@ -21,11 +20,11 @@ func New(params *stripe.CustomerParams) (*stripe.Customer, error) {
 }
 
 func (c Client) New(params *stripe.CustomerParams) (*stripe.Customer, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 		if params.Balance != 0 {
 			body.Add("account_balance", strconv.FormatInt(params.Balance, 10))
 		}
@@ -62,6 +61,16 @@ func (c Client) New(params *stripe.CustomerParams) (*stripe.Customer, error) {
 			params.Shipping.AppendDetails(body)
 		}
 
+		if len(params.BusinessVatID) > 0 {
+			body.Add("business_vat_id", params.BusinessVatID)
+		}
+
+		if params.TaxPercent > 0 {
+			body.Add("tax_percent", strconv.FormatFloat(params.TaxPercent, 'f', 2, 64))
+		} else if params.TaxPercentZero {
+			body.Add("tax_percent", "0")
+		}
+
 		commonParams = &params.Params
 
 		params.AppendTo(body)
@@ -80,11 +89,11 @@ func Get(id string, params *stripe.CustomerParams) (*stripe.Customer, error) {
 }
 
 func (c Client) Get(id string, params *stripe.CustomerParams) (*stripe.Customer, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 		commonParams = &params.Params
 		params.AppendTo(body)
 	}
@@ -102,15 +111,17 @@ func Update(id string, params *stripe.CustomerParams) (*stripe.Customer, error) 
 }
 
 func (c Client) Update(id string, params *stripe.CustomerParams) (*stripe.Customer, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
 		commonParams = &params.Params
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		if params.Balance != 0 {
 			body.Add("account_balance", strconv.FormatInt(params.Balance, 10))
+		} else if params.BalanceZero {
+			body.Add("account_balance", "0")
 		}
 
 		if params.Source != nil {
@@ -136,6 +147,10 @@ func (c Client) Update(id string, params *stripe.CustomerParams) (*stripe.Custom
 
 		if params.Shipping != nil {
 			params.Shipping.AppendDetails(body)
+		}
+
+		if len(params.BusinessVatID) > 0 {
+			body.Add("business_vat_id", params.BusinessVatID)
 		}
 	}
 
@@ -165,17 +180,12 @@ func List(params *stripe.CustomerListParams) *Iter {
 }
 
 func (c Client) List(params *stripe.CustomerListParams) *Iter {
-	type customerList struct {
-		stripe.ListMeta
-		Values []*stripe.Customer `json:"data"`
-	}
-
-	var body *url.Values
+	var body *stripe.RequestValues
 	var lp *stripe.ListParams
 	var p *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		if params.Created > 0 {
 			body.Add("created", strconv.FormatInt(params.Created, 10))
@@ -186,9 +196,9 @@ func (c Client) List(params *stripe.CustomerListParams) *Iter {
 		p = params.ToParams()
 	}
 
-	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
-		list := &customerList{}
-		err := c.B.Call("GET", "/customers", c.Key, &b, p, list)
+	return &Iter{stripe.GetIter(lp, body, func(b *stripe.RequestValues) ([]interface{}, stripe.ListMeta, error) {
+		list := &stripe.CustomerList{}
+		err := c.B.Call("GET", "/customers", c.Key, b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {

@@ -4,6 +4,10 @@ import (
 	"testing"
 
 	stripe "github.com/stripe/stripe-go"
+	"github.com/stripe/stripe-go/bankaccount"
+	"github.com/stripe/stripe-go/card"
+	"github.com/stripe/stripe-go/currency"
+	"github.com/stripe/stripe-go/recipient"
 	"github.com/stripe/stripe-go/token"
 	. "github.com/stripe/stripe-go/utils"
 )
@@ -19,6 +23,7 @@ func TestAccountNew(t *testing.T) {
 		BusinessUrl:          "www.stripe.com",
 		BusinessName:         "Stripe",
 		BusinessPrimaryColor: "#ffffff",
+		DebitNegativeBal:     true,
 		SupportEmail:         "foo@bar.com",
 		SupportUrl:           "www.stripe.com",
 		SupportPhone:         "4151234567",
@@ -151,6 +156,46 @@ func TestAccountReject(t *testing.T) {
 	}
 }
 
+func TestAccountMigrateFromRecipients(t *testing.T) {
+	recipientParams := &stripe.RecipientParams{
+		Name:  "Recipient Name",
+		Type:  "individual",
+		TaxID: "000000000",
+		Email: "a@b.com",
+		Desc:  "Recipient Desc",
+		Bank: &stripe.BankAccountParams{
+			Country: "US",
+			Routing: "110000000",
+			Account: "000123456789",
+		},
+		Card: &stripe.CardParams{
+			Name:   "Test Debit",
+			Number: "4000056655665556",
+			Month:  "10",
+			Year:   "20",
+		},
+	}
+
+	target, err := recipient.New(recipientParams)
+	if err != nil {
+		t.Error(err)
+	}
+
+	target2, err := New(&stripe.AccountParams{FromRecipient: target.ID})
+	if err != nil {
+		t.Error(err)
+	}
+
+	target, err = recipient.Get(target.ID, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if target2.ID != target.MigratedTo.ID {
+		t.Errorf("The new account ID %v does not match the MigratedTo property %v", target2.ID, target.MigratedTo.ID)
+	}
+}
+
 func TestAccountGetByID(t *testing.T) {
 	params := &stripe.AccountParams{
 		Managed: true,
@@ -167,19 +212,68 @@ func TestAccountGetByID(t *testing.T) {
 
 func TestAccountUpdate(t *testing.T) {
 	params := &stripe.AccountParams{
-		Managed: true,
-		Country: "CA",
+		Managed:          true,
+		Country:          "CA",
+		DebitNegativeBal: true,
 	}
 
 	acct, _ := New(params)
 
-	params = &stripe.AccountParams{
-		Statement: "Stripe Go",
+	if acct.DebitNegativeBal != true {
+		t.Error("debit_negative_balance was not set to true")
 	}
 
-	_, err := Update(acct.ID, params)
+	params = &stripe.AccountParams{
+		Statement:          "Stripe Go",
+		NoDebitNegativeBal: true,
+	}
+
+	acct, err := Update(acct.ID, params)
 	if err != nil {
 		t.Error(err)
+	}
+
+	if acct.DebitNegativeBal != false {
+		t.Error("debit_negative_balance was not set to false")
+	}
+}
+
+func TestAccountUpdateLegalEntity(t *testing.T) {
+	params := &stripe.AccountParams{
+		Managed: true,
+		Country: "CA",
+		LegalEntity: &stripe.LegalEntity{
+			Address: stripe.Address{
+				Country: "CA",
+				City:    "Montreal",
+				Zip:     "H2Y 1C6",
+				Line1:   "275, rue Notre-Dame Est",
+				State:   "QC",
+			},
+		},
+	}
+
+	acct, err := New(params)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	params = &stripe.AccountParams{
+		LegalEntity: &stripe.LegalEntity{
+			Address: stripe.Address{
+				Line1: "321, rue Notre-Dame Est",
+			},
+		},
+	}
+
+	acct, err = Update(acct.ID, params)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if acct.LegalEntity.Address.Line1 != params.LegalEntity.Address.Line1 {
+		t.Errorf("The account address line1 %v does not match the params address line1: %v", acct.LegalEntity.Address.Line1, params.LegalEntity.Address.Line1)
 	}
 }
 
@@ -203,6 +297,64 @@ func TestAccountUpdateWithBankAccount(t *testing.T) {
 	_, err := Update(acct.ID, params)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestAccountAddExternalAccountsDefault(t *testing.T) {
+	params := &stripe.AccountParams{
+		Managed: true,
+		Country: "CA",
+		ExternalAccount: &stripe.AccountExternalAccountParams{
+			Country:  "US",
+			Currency: "usd",
+			Routing:  "110000000",
+			Account:  "000123456789",
+		},
+	}
+
+	acct, _ := New(params)
+
+	ba, err := bankaccount.New(&stripe.BankAccountParams{
+		AccountID: acct.ID,
+		Country:   "US",
+		Currency:  "usd",
+		Routing:   "110000000",
+		Account:   "000111111116",
+		Default:   true,
+	})
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ba.Default == false {
+		t.Error("The new external account should be the default but isn't.")
+	}
+
+	baTok, err := token.New(&stripe.TokenParams{
+		Bank: &stripe.BankAccountParams{
+			Country:  "US",
+			Currency: "usd",
+			Routing:  "110000000",
+			Account:  "000333333335",
+		},
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	ba2, err := bankaccount.New(&stripe.BankAccountParams{
+		AccountID: acct.ID,
+		Token:     baTok.ID,
+		Default:   true,
+	})
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if ba2.Default == false {
+		t.Error("The third external account should be the default but isn't.")
 	}
 }
 
@@ -233,6 +385,41 @@ func TestAccountUpdateWithToken(t *testing.T) {
 	_, err := Update(acct.ID, params)
 	if err != nil {
 		t.Error(err)
+	}
+}
+
+func TestAccountUpdateWithCardToken(t *testing.T) {
+	params := &stripe.AccountParams{
+		Managed: true,
+		Country: "US",
+	}
+
+	acct, _ := New(params)
+
+	tokenParams := &stripe.TokenParams{
+		Card: &stripe.CardParams{
+			Number:   "4000056655665556",
+			Month:    "06",
+			Year:     "20",
+			Currency: "usd",
+		},
+	}
+
+	tok, _ := token.New(tokenParams)
+
+	cardParams := &stripe.CardParams{
+		Account: acct.ID,
+		Token:   tok.ID,
+	}
+
+	c, err := card.New(cardParams)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if c.Currency != currency.USD {
+		t.Errorf("Currency %v does not match expected value %v\n", c.Currency, currency.USD)
 	}
 }
 

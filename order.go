@@ -30,20 +30,18 @@ type ShippingParams struct {
 	Phone   string
 }
 
-type AddressParams struct {
-	Line1      string
-	Line2      string
-	City       string
-	State      string
-	PostalCode string
-	Country    string
-}
-
 type OrderUpdateParams struct {
 	Params
 	Coupon                 string
 	SelectedShippingMethod string
 	Status                 OrderStatus
+}
+
+// OrderReturnParams is the set of parameters that can be used when returning
+// orders. For more details, see: https://stripe.com/docs/api#return_order.
+type OrderReturnParams struct {
+	Params
+	Items []*OrderItemParams
 }
 
 type Shipping struct {
@@ -53,15 +51,33 @@ type Shipping struct {
 }
 
 type ShippingMethod struct {
-	ID          string   `json:"id"`
-	Amount      int64    `json:"amount"`
-	Currency    Currency `json:"currency"`
-	Description string   `json:"description"`
+	ID               string            `json:"id"`
+	Amount           int64             `json:"amount"`
+	Currency         Currency          `json:"currency"`
+	Description      string            `json:"description"`
+	DeliveryEstimate *DeliveryEstimate `json:"delivery_estimate"`
+}
+
+type EstimateType string
+
+const (
+	Exact EstimateType = "exact"
+	Range EstimateType = "range"
+)
+
+type DeliveryEstimate struct {
+	Type EstimateType `json:"type"`
+	// If Type == Range
+	Earliest string `json:"earliest"`
+	Latest   string `json:"latest"`
+	// If Type == Exact
+	Date string `json:"date"`
 }
 
 type Order struct {
 	ID                     string            `json:"id"`
 	Amount                 int64             `json:"amount"`
+	AmountReturned         int64             `json:"amount_returned"`
 	Application            string            `json:"application"`
 	ApplicationFee         int64             `json:"application_fee"`
 	Charge                 Charge            `json:"charge"`
@@ -70,12 +86,21 @@ type Order struct {
 	Customer               Customer          `json:"customer"`
 	Email                  string            `json:"email"`
 	Items                  []OrderItem       `json:"items"`
+	Live                   bool              `json:"livemode"`
 	Meta                   map[string]string `json:"metadata"`
+	Returns                *OrderReturnList  `json:"returns"`
 	SelectedShippingMethod *string           `json:"selected_shipping_method"`
 	Shipping               Shipping          `json:"shipping"`
 	ShippingMethods        []ShippingMethod  `json:"shipping_methods"`
+	StatusTransitions      StatusTransitions `json:"status_transitions"`
 	Status                 OrderStatus       `json:"status"`
 	Updated                int64             `json:"updated"`
+}
+
+// OrderList is a list of orders as retrieved from a list endpoint.
+type OrderList struct {
+	ListMeta
+	Values []*Order `json:"data"`
 }
 
 // OrderListParams is the set of parameters that can be used when
@@ -85,6 +110,15 @@ type OrderListParams struct {
 	ListParams
 	IDs    []string
 	Status OrderStatus
+}
+
+// StatsuTransitions are the timestamps at which the order status was updated
+// https://stripe.com/docs/api#order_object
+type StatusTransitions struct {
+	Canceled  int64 `json:"canceled"`
+	Fulfilled int64 `json:"fulfiled"`
+	Paid      int64 `json:"paid"`
+	Returned  int64 `json:"returned"`
 }
 
 // OrderPayParams is the set of parameters that can be used when

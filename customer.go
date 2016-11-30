@@ -2,22 +2,25 @@ package stripe
 
 import (
 	"encoding/json"
-	"net/url"
 )
 
 // CustomerParams is the set of parameters that can be used when creating or updating a customer.
 // For more details see https://stripe.com/docs/api#create_customer and https://stripe.com/docs/api#update_customer.
 type CustomerParams struct {
 	Params
-	Balance       int64
-	Token, Coupon string
-	Source        *SourceParams
-	Desc, Email   string
-	Plan          string
-	Quantity      uint64
-	TrialEnd      int64
-	DefaultSource string
-	Shipping      *CustomerShippingDetails
+	Balance        int64
+	BalanceZero    bool
+	Token, Coupon  string
+	Source         *SourceParams
+	Desc, Email    string
+	Plan           string
+	Quantity       uint64
+	TrialEnd       int64
+	DefaultSource  string
+	Shipping       *CustomerShippingDetails
+	BusinessVatID  string
+	TaxPercent     float64
+	TaxPercentZero bool
 }
 
 // SetSource adds valid sources to a CustomerParams object,
@@ -53,9 +56,16 @@ type Customer struct {
 	Subs          *SubList                 `json:"subscriptions"`
 	Deleted       bool                     `json:"deleted"`
 	Shipping      *CustomerShippingDetails `json:"shipping"`
+	BusinessVatID string                   `json:"business_vat_id"`
 }
 
-// ShippingDetails is the structure containing shipping information.
+// CustomerList is a list of customers as retrieved from a list endpoint.
+type CustomerList struct {
+	ListMeta
+	Values []*Customer `json:"data"`
+}
+
+// CustomerShippingDetails is the structure containing shipping information.
 type CustomerShippingDetails struct {
 	Name    string  `json:"name"`
 	Address Address `json:"address"`
@@ -63,7 +73,7 @@ type CustomerShippingDetails struct {
 }
 
 // AppendDetails adds the shipping details to the query string.
-func (s *CustomerShippingDetails) AppendDetails(values *url.Values) {
+func (s *CustomerShippingDetails) AppendDetails(values *RequestValues) {
 	values.Add("shipping[name]", s.Name)
 
 	values.Add("shipping[address][line1]", s.Address.Line1)

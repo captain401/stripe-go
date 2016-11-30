@@ -2,7 +2,6 @@ package stripe
 
 import (
 	"encoding/json"
-	"net/url"
 )
 
 // DisputeReason is the list of allowed values for a discount's reason.
@@ -62,11 +61,19 @@ type Dispute struct {
 	Meta            map[string]string `json:"metadata"`
 }
 
+// DisputeList is a list of disputes as retrieved from a list endpoint.
+type DisputeList struct {
+	ListMeta
+	Values []*Dispute `json:"data"`
+}
+
 // EvidenceDetails is the structure representing more details about
 // the dispute.
 type EvidenceDetails struct {
-	DueDate int64 `json:"due_by"`
-	Count   int   `json:"submission_count"`
+	Count       int   `json:"submission_count"`
+	DueDate     int64 `json:"due_by"`
+	HasEvidence bool  `json:"has_evidence"`
+	PastDue     bool  `json:"past_due"`
 }
 
 // DisputeEvidence is the structure that contains various details about
@@ -113,7 +120,7 @@ type File struct {
 }
 
 // AppendDetails adds the dispute evidence details to the query string values.
-func (e *DisputeEvidenceParams) AppendDetails(values *url.Values) {
+func (e *DisputeEvidenceParams) AppendDetails(values *RequestValues) {
 	if len(e.ProductDesc) > 0 {
 		values.Add("evidence[product_description]", e.ProductDesc)
 	}

@@ -12,14 +12,26 @@ type SubParams struct {
 	Params
 	Customer, Plan                                  string
 	Coupon, Token                                   string
-	TrialEnd                                        int64
+	TrialEnd, TrialPeriod                           int64
 	Card                                            *CardParams
 	Quantity                                        uint64
 	ProrationDate                                   int64
 	FeePercent, TaxPercent                          float64
+	TaxPercentZero                                  bool
 	NoProrate, EndCancel, QuantityZero, TrialEndNow bool
 	BillingCycleAnchor                              int64
 	BillingCycleAnchorNow                           bool
+	Items                                           []*SubItemsParams
+}
+
+// SubItemsParams is the set of parameters that can be used when creating or updating a subscription item on a subscription
+// For more details see https://stripe.com/docs/api#create_subscription and https://stripe.com/docs/api#update_subscription.
+type SubItemsParams struct {
+	Params
+	ID                    string
+	Quantity              uint64
+	Plan                  string
+	Deleted, QuantityZero bool
 }
 
 // SubListParams is the set of parameters that can be used when listing active subscriptions.
@@ -27,6 +39,8 @@ type SubParams struct {
 type SubListParams struct {
 	ListParams
 	Customer string
+	Plan     string
+	Status   SubStatus
 }
 
 // Sub is the resource representing a Stripe subscription.
@@ -40,6 +54,7 @@ type Sub struct {
 	Status      SubStatus         `json:"status"`
 	FeePercent  float64           `json:"application_fee_percent"`
 	Canceled    int64             `json:"canceled_at"`
+	Created     int64             `json:"created"`
 	Start       int64             `json:"start"`
 	PeriodEnd   int64             `json:"current_period_end"`
 	PeriodStart int64             `json:"current_period_start"`
@@ -49,6 +64,7 @@ type Sub struct {
 	TaxPercent  float64           `json:"tax_percent"`
 	TrialEnd    int64             `json:"trial_end"`
 	TrialStart  int64             `json:"trial_start"`
+	Items       *SubItemList      `json:"items"`
 }
 
 // SubList is a list object for subscriptions.

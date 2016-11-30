@@ -67,7 +67,7 @@ func TestSubscriptionNew(t *testing.T) {
 	}
 
 	if target.PeriodEnd != subParams.BillingCycleAnchor {
-		t.Errorf("PeriodEnd %f does not match expected BillingCycleAnchor %f\n", target.PeriodEnd, subParams.BillingCycleAnchor)
+		t.Errorf("PeriodEnd %v does not match expected BillingCycleAnchor %v\n", target.PeriodEnd, subParams.BillingCycleAnchor)
 	}
 
 	customer.Del(cust.ID)
@@ -98,9 +98,10 @@ func TestSubscriptionZeroQuantity(t *testing.T) {
 	plan.New(planParams)
 
 	subParams := &stripe.SubParams{
-		Customer:     cust.ID,
-		Plan:         "test",
-		QuantityZero: true,
+		Customer:       cust.ID,
+		Plan:           "test",
+		QuantityZero:   true,
+		TaxPercentZero: true,
 	}
 
 	target, err := New(subParams)
@@ -115,6 +116,65 @@ func TestSubscriptionZeroQuantity(t *testing.T) {
 
 	if target.Quantity != 0 {
 		t.Errorf("Quantity %v does not match expected quantity %v\n", target.Quantity, 0)
+	}
+
+	if target.TaxPercent != 0 {
+		t.Errorf("Tax percent %v does not match expected tax percent %v\n", target.TaxPercent, 0)
+	}
+
+	customer.Del(cust.ID)
+	plan.Del("test")
+}
+
+func TestSubscriptionUpdateZeroQuantity(t *testing.T) {
+	customerParams := &stripe.CustomerParams{
+		Source: &stripe.SourceParams{
+			Card: &stripe.CardParams{
+				Number: "378282246310005",
+				Month:  "06",
+				Year:   "20",
+			},
+		},
+	}
+
+	cust, _ := customer.New(customerParams)
+
+	planParams := &stripe.PlanParams{
+		ID:       "test",
+		Name:     "Test Plan",
+		Amount:   99,
+		Currency: currency.USD,
+		Interval: plan.Month,
+	}
+
+	plan.New(planParams)
+
+	subParams := &stripe.SubParams{
+		Customer:    cust.ID,
+		Plan:        "test",
+		Quantity:    10,
+		TrialEndNow: true,
+	}
+
+	subscription, _ := New(subParams)
+	updatedSub := &stripe.SubParams{
+		NoProrate:      true,
+		QuantityZero:   true,
+		TaxPercentZero: true,
+	}
+
+	target, err := Update(subscription.ID, updatedSub)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if target.Quantity != updatedSub.Quantity {
+		t.Errorf("Quantity %v does not match expected quantity %v\n", target.Quantity, updatedSub.Quantity)
+	}
+
+	if target.TaxPercent != updatedSub.TaxPercent {
+		t.Errorf("TaxPercent %f does not match expected tax_percent %f\n", target.TaxPercent, updatedSub.TaxPercent)
 	}
 
 	customer.Del(cust.ID)
@@ -151,7 +211,17 @@ func TestSubscriptionGet(t *testing.T) {
 	}
 
 	subscription, _ := New(subParams)
-	target, err := Get(subscription.ID, &stripe.SubParams{Customer: cust.ID})
+	target, err := Get(subscription.ID, nil)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if target.ID != subscription.ID {
+		t.Errorf("Subscription id %q does not match expected id %q\n", target.ID, subscription.ID)
+	}
+
+	target, err = Get(subscription.ID, &stripe.SubParams{Customer: cust.ID})
 
 	if err != nil {
 		t.Error(err)
@@ -195,14 +265,25 @@ func TestSubscriptionCancel(t *testing.T) {
 	}
 
 	subscription, _ := New(subParams)
-	s, err := Cancel(subscription.ID, &stripe.SubParams{Customer: cust.ID})
+	s, err := Cancel(subscription.ID, nil)
 
 	if err != nil {
 		t.Error(err)
 	}
 
 	if s.Canceled == 0 {
-		t.Errorf("Subscription.Canceled %i expected to be non 0\n", s.Canceled)
+		t.Errorf("Subscription.Canceled %v expected to be non 0\n", s.Canceled)
+	}
+
+	subscription, _ = New(subParams)
+	s, err = Cancel(subscription.ID, &stripe.SubParams{Customer: cust.ID})
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if s.Canceled == 0 {
+		t.Errorf("Subscription.Canceled %v expected to be non 0\n", s.Canceled)
 	}
 
 	customer.Del(cust.ID)
@@ -241,7 +322,6 @@ func TestSubscriptionUpdate(t *testing.T) {
 
 	subscription, _ := New(subParams)
 	updatedSub := &stripe.SubParams{
-		Customer:   cust.ID,
 		NoProrate:  true,
 		Quantity:   13,
 		TaxPercent: 20.0,
@@ -282,7 +362,6 @@ func TestSubscriptionDiscount(t *testing.T) {
 				Year:   "20",
 			},
 		},
-		Coupon: "sub_coupon",
 	}
 
 	cust, _ := customer.New(customerParams)
@@ -322,10 +401,20 @@ func TestSubscriptionDiscount(t *testing.T) {
 		t.Errorf("Coupon id %q does not match expected id %q\n", target.Discount.Coupon.ID, subParams.Coupon)
 	}
 
-	_, err = discount.DelSub(cust.ID, target.ID)
+	_, err = discount.DelSub(target.ID)
 
 	if err != nil {
 		t.Error(err)
+	}
+
+	target, err = Get(target.ID, nil)
+
+	if err != nil {
+		t.Error(err)
+	}
+
+	if target.Discount != nil {
+		t.Errorf("A discount %v was found, but was expected to have been deleted\n", target.Discount)
 	}
 
 	customer.Del(cust.ID)
@@ -366,7 +455,33 @@ func TestSubscriptionList(t *testing.T) {
 		New(subParams)
 	}
 
-	i := List(&stripe.SubListParams{Customer: cust.ID})
+	params := &stripe.SubListParams{Customer: cust.ID, Plan: "test"}
+	params.Filters.AddFilter("limit", "", "3")
+	i := List(params)
+
+	for i.Next() {
+		if i.Sub() == nil {
+			t.Error("No nil values expected")
+		}
+
+		if i.Meta() == nil {
+			t.Error("No metadata returned")
+		}
+
+		if i.Sub().Customer.ID != cust.ID {
+			t.Errorf("Expected customer %v not %v", cust.ID, i.Sub().Customer.ID)
+		}
+
+		if i.Sub().Plan.ID != "test" {
+			t.Errorf("Expected plan test not %v", i.Sub().Plan.ID)
+		}
+	}
+
+	if err := i.Err(); err != nil {
+		t.Error(err)
+	}
+
+	i = List(nil)
 	for i.Next() {
 		if i.Sub() == nil {
 			t.Error("No nil values expected")

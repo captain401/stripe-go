@@ -11,6 +11,7 @@ type InvoiceItemParams struct {
 	Currency           Currency
 	Invoice, Desc, Sub string
 	Discountable       bool
+	NoDiscountable     bool
 }
 
 // InvoiceItemListParams is the set of parameters that can be used when listing invoice items.
@@ -37,6 +38,12 @@ type InvoiceItem struct {
 	Sub          string            `json:"subscription"`
 	Discountable bool              `json:"discountable"`
 	Deleted      bool              `json:"deleted"`
+}
+
+// InvoiceItemList is a list of invoice items as retrieved from a list endpoint.
+type InvoiceItemList struct {
+	ListMeta
+	Values []*InvoiceItem `json:"data"`
 }
 
 // UnmarshalJSON handles deserialization of an InvoiceItem.

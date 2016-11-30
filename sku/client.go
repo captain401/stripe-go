@@ -2,7 +2,6 @@ package sku
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 
 	stripe "github.com/stripe/stripe-go"
@@ -23,11 +22,11 @@ func New(params *stripe.SKUParams) (*stripe.SKU, error) {
 // New POSTs a new SKU.
 // For more details see https://stripe.com/docs/api#create_sku.
 func (c Client) New(params *stripe.SKUParams) (*stripe.SKU, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		// Required fields
 		body.Add("price", strconv.FormatInt(params.Price, 10))
@@ -98,11 +97,11 @@ func Update(id string, params *stripe.SKUParams) (*stripe.SKU, error) {
 // Update updates a SKU's properties.
 // For more details see https://stripe.com/docs/api#update_sku.
 func (c Client) Update(id string, params *stripe.SKUParams) (*stripe.SKU, error) {
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		// Required fields
 		if params.Price > 0 {
@@ -124,6 +123,10 @@ func (c Client) Update(id string, params *stripe.SKUParams) (*stripe.SKU, error)
 
 		if len(params.Image) > 0 {
 			body.Add("image", params.Image)
+		}
+
+		for k, v := range params.Attrs {
+			body.Add(fmt.Sprintf("attributes[%v]", k), v)
 		}
 
 		inventory := params.Inventory
@@ -149,6 +152,10 @@ func (c Client) Update(id string, params *stripe.SKUParams) (*stripe.SKU, error)
 				fmt.Sprintf("%.2f", params.PackageDimensions.Weight))
 		}
 
+		if params.Product != "" {
+			body.Add("product", params.Product)
+		}
+
 		params.AppendTo(body)
 	}
 
@@ -166,12 +173,12 @@ func Get(id string, params *stripe.SKUParams) (*stripe.SKU, error) {
 
 func (c Client) Get(id string, params *stripe.SKUParams) (*stripe.SKU, error) {
 	sku := &stripe.SKU{}
-	var body *url.Values
+	var body *stripe.RequestValues
 	var commonParams *stripe.Params
 
 	if params != nil {
 		commonParams = &params.Params
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 		params.AppendTo(body)
 	}
 	err := c.B.Call("GET", "/skus/"+id, c.Key, body, commonParams, sku)
@@ -186,17 +193,12 @@ func List(params *stripe.SKUListParams) *Iter {
 }
 
 func (c Client) List(params *stripe.SKUListParams) *Iter {
-	type skuList struct {
-		stripe.ListMeta
-		Values []*stripe.SKU `json:"data"`
-	}
-
-	var body *url.Values
+	var body *stripe.RequestValues
 	var lp *stripe.ListParams
 	var p *stripe.Params
 
 	if params != nil {
-		body = &url.Values{}
+		body = &stripe.RequestValues{}
 
 		if params.Active != nil {
 			params.Filters.AddFilter(
@@ -226,9 +228,9 @@ func (c Client) List(params *stripe.SKUListParams) *Iter {
 		p = params.ToParams()
 	}
 
-	return &Iter{stripe.GetIter(lp, body, func(b url.Values) ([]interface{}, stripe.ListMeta, error) {
-		list := &skuList{}
-		err := c.B.Call("GET", "/skus", c.Key, &b, p, list)
+	return &Iter{stripe.GetIter(lp, body, func(b *stripe.RequestValues) ([]interface{}, stripe.ListMeta, error) {
+		list := &stripe.SKUList{}
+		err := c.B.Call("GET", "/skus", c.Key, b, p, list)
 
 		ret := make([]interface{}, len(list.Values))
 		for i, v := range list.Values {
